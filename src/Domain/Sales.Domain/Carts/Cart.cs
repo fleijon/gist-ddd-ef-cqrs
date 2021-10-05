@@ -1,22 +1,21 @@
-﻿using Ardalis.GuardClauses;
-using Sales.Domain.Customers;
+﻿using Sales.Domain.Customers;
 using Sales.Domain.Products;
 using SharedKernel;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace Sales.Domain.Carts
 {
     public class Cart : AggregateRoot<CartId>
     {
-        private Cart()
+        public Cart(ICartData cartData)
         {
+            _cartData = cartData;
         }
 
-        public CustomerId CustomerId { get; private set; }
+        public CustomerId CustomerId => new CustomerId(Guid.Parse(_cartData.CustomerId));
 
-        public IReadOnlyCollection<CartItem> CartItems => _cartItems.Select((kv) => kv.Value).ToList().AsReadOnly();
+        public IReadOnlyCollection<CartItem> CartItems => _cartData.CartItems.AsReadOnly();
 
         private Cart(CartId id, CustomerId customerId, IEnumerable<CartItem> cartItems)
         {
@@ -29,31 +28,21 @@ namespace Sales.Domain.Carts
             }
         }
 
-        public static Cart Of(
-            CartId cartId,
-            CustomerId customerId,
-            IEnumerable<CartItem> cartItems)
-        {
-            return new Cart(cartId, customerId, cartItems);
-        }
-
-        public static Cart CreateNew(CustomerId customerId)
+        public static Cart Create(CustomerId customerId)
         {
             if (customerId is null)
             {
                 throw new BusinessRuleException("A cart must be assigned a customer.");
             }
 
-            return new Cart(new CartId(Guid.NewGuid()), customerId, new CartItem[] { });
+            return new Cart(new CartId(Guid.NewGuid()), customerId);
         }
 
         private Dictionary<ProductId, CartItem> _cartItems = new Dictionary<ProductId, CartItem>();
+        private readonly ICartData _cartData;
 
         public void AddItem(ProductId productId, Money productPrice, uint quantity)
         {
-            Guard.Against.Null(productId, nameof(productId));
-            Guard.Against.Null(productPrice, nameof(productPrice));
-
             if (_cartItems.ContainsKey(productId))
             {
                 var item = _cartItems[productId];
